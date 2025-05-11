@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>選擇要用的檔案問AI</title>
+  <style>
+    body {
+      background-color: #1a1a1a;
+      color: #ffffff;
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    h1 {
+      color: #98ff98; /* 薄荷綠 */
+      font-size: 2.5em;
+      margin-bottom: 20px;
+    }
+
+    .button {
+      background-color: #6a0dad; /* 紫底 */
+      color: #ffffff; /* 白字 */
+      border: none;
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+      border-radius: 5px;
+      margin: 5px;
+      transition: background-color 0.3s;
+    }
+
+    .button:hover {
+      background-color: #8b30e0; /* 較亮的紫色 */
+    }
+
+    .file-button {
+      background-color: #4a4a4a; /* 灰色 - 關閉狀態 */
+      color: #ffffff;
+      border: none;
+      padding: 8px 15px;
+      font-size: 14px;
+      cursor: pointer;
+      border-radius: 5px;
+      margin: 5px;
+      transition: background-color 0.3s;
+    }
+
+    .file-button.active {
+      background-color: #ff8c00; /* 橙色 - 啟用狀態 */
+    }
+
+    .file-button:hover {
+      background-color: #666666; /* 灰色懸停 */
+    }
+
+    .file-button.active:hover {
+      background-color: #e07b00; /* 橙色懸停 */
+    }
+
+    .container {
+      display: flex;
+      width: 100%;
+      max-width: 1200px;
+      margin-top: 20px;
+    }
+
+    .textarea {
+      width: 48%;
+      height: 300px;
+      background-color: #2a2a2a;
+      color: #ffffff;
+      border: 1px solid #444;
+      border-radius: 5px;
+      padding: 10px;
+      font-size: 14px;
+      resize: none;
+      margin: 0 1%;
+    }
+
+    .textarea.dragover {
+      border-color: #98ff98; /* 拖曳時邊框變薄荷綠 */
+      background-color: #3a3a3a; /* 略亮背景 */
+    }
+
+    .generate-button {
+      margin-top: 20px;
+      background-color: #6a0dad;
+      color: #ffffff;
+      padding: 12px 30px;
+      font-size: 18px;
+      border-radius: 5px;
+    }
+
+    .generate-button:hover {
+      background-color: #8b30e0;
+    }
+
+    #fileButtons {
+      margin: 20px 0;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+  </style>
+</head>
+<body>
+  <h1>選擇要用的檔案問AI</h1>
+  <input type="file" id="fileInput" accept=".txt" style="display: none;">
+  <button class="button" onclick="document.getElementById('fileInput').click()">載入TXT檔案</button>
+  <div id="fileButtons"></div>
+  <div class="container">
+    <textarea id="inputContent" class="textarea" readonly placeholder="拖曳或載入TXT檔案以顯示內容"></textarea>
+    <textarea id="outputContent" class="textarea" readonly placeholder="生成的內容將顯示在這裡"></textarea>
+  </div>
+  <button class="generate-button" onclick="generateOutput()">生成</button>
+
+  <script>
+    let fileContent = '';
+    let selectedFiles = new Set();
+    let fileData = [];
+
+    // 載入TXT檔案（通過選擇）
+    document.getElementById('fileInput').addEventListener('change', async (event) => {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      fileContent = await file.text();
+      document.getElementById('inputContent').value = fileContent;
+      generateFileButtons(fileContent);
+    });
+
+    // 拖曳支援
+    const inputTextarea = document.getElementById('inputContent');
+
+    inputTextarea.addEventListener('dragover', (event) => {
+      event.preventDefault();
+      inputTextarea.classList.add('dragover');
+    });
+
+    inputTextarea.addEventListener('dragleave', () => {
+      inputTextarea.classList.remove('dragover');
+    });
+
+    inputTextarea.addEventListener('drop', async (event) => {
+      event.preventDefault();
+      inputTextarea.classList.remove('dragover');
+
+      const file = event.dataTransfer.files[0];
+      if (!file || file.type !== 'text/plain') {
+        alert('請拖曳一個TXT檔案！');
+        return;
+      }
+
+      fileContent = await file.text();
+      document.getElementById('inputContent').value = fileContent;
+      generateFileButtons(fileContent);
+    });
+
+    // 生成檔案按鈕
+    function generateFileButtons(content) {
+      const fileButtonsDiv = document.getElementById('fileButtons');
+      fileButtonsDiv.innerHTML = '';
+      const regex = /<!--([\w\/\[\]-]+\.\w+)-->\n*([\s\S]*?)(?=(<!--[\w\/\[\]-]+\.\w+-->|$))/g;
+      fileData = [];
+      let match;
+
+      // 解析檔案內容
+      while ((match = regex.exec(content)) !== null) {
+        const fileName = match[1];
+        const fileContent = match[2].trim();
+        // 檢查是否已經存在該檔案名，避免重複（如 css/delay.css）
+        if (!fileData.some(f => f.name === fileName)) {
+          fileData.push({ name: fileName, content: fileContent });
+        }
+      }
+
+      // 生成按鈕
+      fileData.forEach(file => {
+        const button = document.createElement('button');
+        button.className = 'file-button';
+        // 顯示檔案名稱（不包含路徑）
+        button.textContent = file.name.split('/').pop();
+        button.dataset.name = file.name;
+        button.dataset.content = file.content;
+        button.onclick = () => toggleFileButton(button);
+        fileButtonsDiv.appendChild(button);
+      });
+    }
+
+    // 切換檔案按鈕狀態
+    function toggleFileButton(button) {
+      const name = button.dataset.name;
+      if (selectedFiles.has(name)) {
+        selectedFiles.delete(name);
+        button.classList.remove('active');
+      } else {
+        selectedFiles.add(name);
+        button.classList.add('active');
+      }
+    }
+
+    // 生成輸出
+    function generateOutput() {
+      if (selectedFiles.size === 0) {
+        alert('請至少選擇一個檔案！');
+        return;
+      }
+    
+      // 按照 fileData 的原始順序過濾並生成輸出
+      const output = fileData
+        .filter(file => selectedFiles.has(file.name))
+        .map(file => `<!--${file.name}-->\n${file.content}\n<!--${file.name}-->`)
+        .join('\n\n');
+    
+      const outputTextarea = document.getElementById('outputContent');
+      outputTextarea.value = output;
+    
+      // 自動複製到剪貼簿
+      outputTextarea.select();
+      try {
+        document.execCommand('copy');
+        alert('已生成並複製到剪貼簿！');
+      } catch (err) {
+        console.error('複製失敗:', err);
+        alert('生成成功，但複製到剪貼簿失敗，請手動複製！');
+      }
+    }
+  </script>
+</body>
+</html>
