@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>選擇要用的檔案問AI</title>
+  <style>
+    body {
+      background-color: #1a1a1a;
+      color: #ffffff;
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    h1 {
+      color: #98ff98; /* 薄荷綠 */
+      font-size: 2.5em;
+      margin-bottom: 20px;
+    }
+
+    .button {
+      background-color: #6a0dad; /* 紫底 */
+      color: #ffffff; /* 白字 */
+      border: none;
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+      border-radius: 5px;
+      margin: 5px;
+      transition: background-color 0.3s;
+    }
+
+    .button:hover {
+      background-color: #8b30e0; /* 較亮的紫色 */
+    }
+
+    .file-button {
+      background-color: #4a4a4a; /* 灰色 - 關閉狀態 */
+      color: #ffffff;
+      border: none;
+      padding: 8px 15px;
+      font-size: 14px;
+      cursor: pointer;
+      border-radius: 5px;
+      margin: 5px;
+      transition: background-color 0.3s;
+    }
+
+    .file-button.active {
+      background-color: #ff8c00; /* 橙色 - 啟用狀態 */
+    }
+
+    .file-button:hover {
+      background-color: #666666; /* 灰色懸停 */
+    }
+
+    .file-button.active:hover {
+      background-color: #e07b00; /* 橙色懸停 */
+    }
+
+    .checkbox-container {
+      display: inline-block;
+      margin-left: 10px;
+      vertical-align: middle;
+    }
+
+    .function-button {
+      background-color: #4a4a4a; /* 灰色 - 關閉狀態 */
+      color: #ffffff;
+      border: none;
+      padding: 6px 12px;
+      font-size: 12px;
+      cursor: pointer;
+      border-radius: 5px;
+      margin: 3px;
+      transition: background-color 0.3s;
+    }
+
+    .function-button.active {
+      background-color: #6a0dad; /* 紫色 - 啟用狀態 */
+    }
+
+    .function-button:hover {
+      background-color: #666666; /* 灰色懸停 */
+    }
+
+    .function-button.active:hover {
+      background-color: #8b30e0; /* 紫色懸停 */
+    }
+
+    .file-section {
+      width: 100%;
+      max-width: 1200px;
+      margin: 10px 0;
+      padding: 10px;
+      background-color: #2a2a2a;
+      border-radius: 5px;
+    }
+
+    .file-section h3 {
+      color: #98ff98;
+      margin: 0 0 10px 0;
+      font-size: 1.2em;
+    }
+
+    .container {
+      display: flex;
+      width: 100%;
+      max-width: 1200px;
+      margin-top: 20px;
+    }
+
+    .textarea {
+      width: 48%;
+      height: 300px;
+      background-color: #2a2a2a;
+      color: #ffffff;
+      border: 1px solid #444;
+      border-radius: 5px;
+      padding: 10px;
+      font-size: 14px;
+      resize: none;
+      margin: 0 1%;
+    }
+
+    .textarea.dragover {
+      border-color: #98ff98; /* 拖曳時邊框變薄荷綠 */
+      background-color: #3a3a3a; /* 略亮背景 */
+    }
+
+    .generate-button {
+      margin-top: 20px;
+      background-color: #6a0dad;
+      color: #ffffff;
+      padding: 12px 30px;
+      font-size: 18px;
+      border-radius: 5px;
+    }
+
+    .generate-button:hover {
+      background-color: #8b30e0;
+    }
+
+    #fileButtons {
+      margin: 20px 0;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    #functionSections {
+      width: 100%;
+      max-width: 1200px;
+    }
+
+    .copy-button {
+      background-color: #4fc3f7; /* 淺藍色 */
+      color: #ffffff;
+      border: none;
+      padding: 6px 12px;
+      font-size: 12px;
+      cursor: pointer;
+      border-radius: 5px;
+      margin-left: 10px;
+      transition: background-color 0.3s;
+    }
+    
+    .copy-button:hover {
+      background-color: #29b6f6; /* 較深的淺藍色 */
+    }
+    
+    .output-box {
+      background-color: #2a2a2a;
+      color: #ffffff;
+      border: 1px solid #444;
+      border-radius: 5px;
+      padding: 6px;
+      font-size: 12px;
+      margin-left: 10px;
+      width: 200px;
+      display: inline-block;
+      vertical-align: middle;
+    }
+  </style>
+</head>
+<body>
+  <h1>選擇要用的檔案問AI</h1>
+  <input type="file" id="fileInput" accept=".txt" style="display: none;">
+  <button class="button" onclick="document.getElementById('fileInput').click()">載入TXT檔案</button>
+  <div id="fileButtons"></div>
+  <div id="functionSections"></div>
+  <div class="container">
+    <textarea id="inputContent" class="textarea" readonly placeholder="拖曳或載入TXT檔案以顯示內容"></textarea>
+    <textarea id="outputContent" class="textarea" readonly placeholder="生成的內容將顯示在這裡"></textarea>
+  </div>
+  <button class="generate-button" onclick="generateOutput()">生成</button>
+  
+  <script>
+    let fileContent = '';
+    let selectedFiles = new Set();
+    let checkedFiles = new Set();
+    let selectedFunctions = new Map(); // Map<fileName, Set<functionName>>
+    let fileData = [];
+
+    // 載入TXT檔案（通過選擇）
+    document.getElementById('fileInput').addEventListener('change', async (event) => {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      fileContent = await file.text();
+      document.getElementById('inputContent').value = fileContent;
+      generateFileButtons(fileContent);
+    });
+
+    // 拖曳支援
+    const inputTextarea = document.getElementById('inputContent');
+
+    inputTextarea.addEventListener('dragover', (event) => {
+      event.preventDefault();
+      inputTextarea.classList.add('dragover');
+    });
+
+    inputTextarea.addEventListener('dragleave', () => {
+      inputTextarea.classList.remove('dragover');
+    });
+
+    inputTextarea.addEventListener('drop', async (event) => {
+      event.preventDefault();
+      inputTextarea.classList.remove('dragover');
+
+      const file = event.dataTransfer.files[0];
+      if (!file || file.type !== 'text/plain') {
+        alert('請拖曳一個TXT檔案！');
+        return;
+      }
+
+      fileContent = await file.text();
+      document.getElementById('inputContent').value = fileContent;
+      generateFileButtons(fileContent);
+    });
+
+    // 解析 function 名稱（包括類內方法）
+function extractFunctions(content) {
+  const functionNames = new Set();
+
+  // 匹配普通函數：function name() {} 或 name() {}
+  const functionRegex = /(?:^|\n\s*)(?:function\s+)?([a-zA-Z_$][\w$]*)\s*\([^)]*\)\s*\{(?![^{]*?class\s)/gm;
+  let match;
+  while ((match = functionRegex.exec(content)) !== null) {
+    const name = match[1];
+    // 排除名稱為 if 或 for
+    if (name === 'if' || name === 'for') continue;
+    const startIndex = match.index;
+    // 檢查上下文，排除控制結構中的匹配
+    const beforeMatch = content.slice(0, startIndex);
+    const lastLines = beforeMatch.split('\n').slice(-2).join('\n');
+    if (!/(?:\bfor\b|\bif\b|\bwhile\b|\bswitch\b|\blet\b\s*\w+\s*=|\breturn\b\s*{)/.test(lastLines)) {
+      functionNames.add(name);
+    }
+  }
+
+  // 匹配類定義：export class Name {} 或 class Name {}
+  const classRegex = /(?:export\s+)?class\s+([a-zA-Z_$][\w$]*)\s*\{([\s\S]*?)\}/g;
+  while ((match = classRegex.exec(content)) !== null) {
+    const className = match[1];
+    const classBody = match[2];
+    // 提取類內方法
+    const methodRegex = /(?:^|\n\s*)([a-zA-Z_$][\w$]*)\s*\([^)]*\)\s*\{/gm;
+    let methodMatch;
+    while ((methodMatch = methodRegex.exec(classBody)) !== null) {
+      const methodName = methodMatch[1];
+      // 排除名稱為 if 或 for
+      if (methodName === 'if' || methodName === 'for') continue;
+      const methodStartIndex = methodMatch.index;
+      // 檢查上下文，排除控制結構中的匹配
+      const beforeMethod = classBody.slice(0, methodStartIndex);
+      const lastLines = beforeMethod.split('\n').slice(-2).join('\n');
+      if (!/(?:\bfor\b|\bif\b|\bwhile\b|\bswitch\b|\blet\b\s*\w+\s*=|\breturn\b\s*{)/.test(lastLines)) {
+        functionNames.add(`${className}.${methodName}`);
+      }
+    }
+  }
+
+  return Array.from(functionNames);
+}
+
+    // 提取 function 內容（支援嵌套 {} 和類內方法）
+    function extractFunctionContent(content, functionName) {
+      if (functionName.includes('.')) {
+        // 處理類內方法（格式：ClassName.methodName）
+        const [className, methodName] = functionName.split('.');
+        // 匹配類定義
+        const classRegex = new RegExp(`(?:export\\s+)?class\\s+${className}\\s*\\{([\\s\\S]*?)\\}`);
+        const classMatch = content.match(classRegex);
+        if (!classMatch) return '';
+
+        const classBody = classMatch[1];
+        // 匹配方法（包括空函數）
+        const methodRegex = new RegExp(`(?:^|\\n\\s*)${methodName}\\s*\\([^)]*\\)\\s*\\{([\\s\\S]*?)\\}\\s*(?=(?:\\n\\s*\\w+\\s*\\([^)]*\\)\\s*\\{|\\n\\s*\\}|$))`, 'm');
+        const methodMatch = classBody.match(methodRegex);
+        if (!methodMatch) return '';
+
+        const startIndex = methodMatch.index;
+        const fullMatch = methodMatch[0];
+        // 如果是空函數，直接返回匹配的完整內容
+        if (methodMatch[1].trim() === '') {
+          return fullMatch.trim();
+        }
+
+        let braceCount = 1;
+        let currentIndex = startIndex + fullMatch.length - methodMatch[1].length - 1;
+
+        // 逐字元解析，追蹤 {} 嵌套
+        while (currentIndex < classBody.length && braceCount > 0) {
+          const char = classBody[currentIndex];
+          if (char === '{') {
+            braceCount++;
+          } else if (char === '}') {
+            braceCount--;
+          }
+          currentIndex++;
+        }
+
+        if (braceCount === 0) {
+          return classBody.slice(startIndex, currentIndex).trim();
+        }
+        return '';
+      } else {
+        // 處理普通函數
+        const functionRegex = new RegExp(`(?:^|\\n\\s*)(?:function\\s+)?${functionName}\\s*\\([^)]*\\)\\s*\\{([\\s\\S]*?)\\}\\s*(?=(?:\\n\\s*\\w+\\s*\\([^)]*\\)\\s*\\{|\\n\\s*\\}|$))`, 'm');
+        const startMatch = content.match(functionRegex);
+        if (!startMatch) return '';
+
+        const startIndex = startMatch.index;
+        const fullMatch = startMatch[0];
+        // 如果是空函數，直接返回匹配的完整內容
+        if (startMatch[1].trim() === '') {
+          return fullMatch.trim();
+        }
+
+        let braceCount = 1;
+        let currentIndex = startIndex + fullMatch.length - startMatch[1].length - 1;
+
+        // 逐字元解析，追蹤 {} 嵌套
+        while (currentIndex < content.length && braceCount > 0) {
+          const char = content[currentIndex];
+          if (char === '{') {
+            braceCount++;
+          } else if (char === '}') {
+            braceCount--;
+          }
+          currentIndex++;
+        }
+
+        if (braceCount === 0) {
+          return content.slice(startIndex, currentIndex).trim();
+        }
+        return '';
+      }
+    }
+
+    // 生成檔案按鈕
+    function generateFileButtons(content) {
+      const fileButtonsDiv = document.getElementById('fileButtons');
+      fileButtonsDiv.innerHTML = '';
+      const functionSectionsDiv = document.getElementById('functionSections');
+      functionSectionsDiv.innerHTML = '';
+      fileData = [];
+      selectedFiles.clear();
+      checkedFiles.clear();
+      selectedFunctions.clear();
+
+      const regex = /<!--([\w\/\[\]-]+\.\w+)-->\n*([\s\S]*?)(?=(<!--[\w\/\[\]-]+\.\w+-->|$))/g;
+      let match;
+
+      // 解析檔案內容
+      while ((match = regex.exec(content)) !== null) {
+        const fileName = match[1];
+        const fileContent = match[2].trim();
+        if (!fileData.some(f => f.name === fileName)) {
+          fileData.push({ name: fileName, content: fileContent });
+        }
+      }
+
+      // 生成按鈕
+      fileData.forEach(file => {
+        const buttonContainer = document.createElement('div');
+        buttonContainer.style.display = 'inline-block';
+
+        const button = document.createElement('button');
+        button.className = 'file-button';
+        button.textContent = file.name.split('/').pop();
+        button.dataset.name = file.name;
+        button.dataset.content = file.content;
+        button.onclick = () => toggleFileButton(button, buttonContainer);
+        buttonContainer.appendChild(button);
+
+        fileButtonsDiv.appendChild(buttonContainer);
+      });
+    }
+
+    // 切換檔案按鈕狀態
+    function toggleFileButton(button, buttonContainer) {
+      const name = button.dataset.name;
+      if (selectedFiles.has(name)) {
+        selectedFiles.delete(name);
+        button.classList.remove('active');
+        checkedFiles.delete(name);
+        selectedFunctions.delete(name);
+        // 移除 checkbox
+        const checkbox = buttonContainer.querySelector('input[type="checkbox"]');
+        if (checkbox) {
+          buttonContainer.removeChild(checkbox);
+        }
+        updateFunctionSections();
+      } else {
+        selectedFiles.add(name);
+        button.classList.add('active');
+        // 添加 checkbox
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.className = 'checkbox-container';
+        checkbox.onchange = () => toggleCheckbox(name, checkbox.checked);
+        buttonContainer.appendChild(checkbox);
+        updateFunctionSections();
+      }
+    }
+
+    // 切換 checkbox 狀態
+    function toggleCheckbox(fileName, isChecked) {
+      if (isChecked) {
+        checkedFiles.add(fileName);
+      } else {
+        checkedFiles.delete(fileName);
+        selectedFunctions.delete(fileName);
+      }
+      updateFunctionSections();
+    }
+
+    // 更新 function 區塊
+// 更新 function 區塊
+function updateFunctionSections() {
+  const functionSectionsDiv = document.getElementById('functionSections');
+  functionSectionsDiv.innerHTML = '';
+
+  fileData
+    .filter(file => checkedFiles.has(file.name))
+    .forEach(file => {
+      const section = document.createElement('div');
+      section.className = 'file-section';
+
+      const titleContainer = document.createElement('div');
+      titleContainer.style.display = 'flex';
+      titleContainer.style.alignItems = 'center';
+
+      const title = document.createElement('h3');
+      title.textContent = `----${file.name}----`;
+      titleContainer.appendChild(title);
+
+      // 新增淺藍色按鈕
+      const copyButton = document.createElement('button');
+      copyButton.className = 'copy-button';
+      copyButton.textContent = '複製按鈕名稱';
+      copyButton.onclick = () => {
+        const functions = extractFunctions(file.content);
+        const validFunctions = functions.filter(func => !func.endsWith('.constructor')); // 排除名稱以 .constructor 結尾
+        const outputBox = titleContainer.querySelector('.output-box');
+        outputBox.value = validFunctions.join('、'); // 以「、」分隔
+        // 自動複製到剪貼簿
+        outputBox.select();
+        try {
+          document.execCommand('copy');
+          alert('已複製到剪貼簿！');
+        } catch (err) {
+          console.error('複製失敗:', err);
+          alert('複製到剪貼簿失敗，請手動複製！');
+        }
+      };
+      titleContainer.appendChild(copyButton);
+
+      // 新增輸出框
+      const outputBox = document.createElement('textarea');
+      outputBox.className = 'output-box';
+      outputBox.readOnly = true;
+      titleContainer.appendChild(outputBox);
+
+      section.appendChild(titleContainer);
+
+      const functions = extractFunctions(file.content);
+      if (functions.length === 0) {
+        const noFunctions = document.createElement('p');
+        noFunctions.textContent = '無 function 定義';
+        section.appendChild(noFunctions);
+      } else {
+        functions.forEach(func => {
+          // 排除名稱為 if 或 for 的按鈕
+          const funcName = func.includes('.') ? func.split('.').pop() : func;
+          if (funcName === 'if' || funcName === 'for') return;
+          const funcButton = document.createElement('button');
+          funcButton.className = 'function-button';
+          funcButton.textContent = func;
+          funcButton.dataset.fileName = file.name;
+          funcButton.dataset.funcName = func;
+          funcButton.onclick = () => toggleFunctionButton(funcButton);
+          // 檢查是否已選中
+          const selectedFuncs = selectedFunctions.get(file.name) || new Set();
+          if (selectedFuncs.has(func)) {
+            funcButton.className += ' active';
+          }
+          section.appendChild(funcButton);
+        });
+      }
+
+      functionSectionsDiv.appendChild(section);
+    });
+}
+
+    // 切換 function 按鈕狀態
+    function toggleFunctionButton(button) {
+      const fileName = button.dataset.fileName;
+      const funcName = button.dataset.funcName;
+      let selectedFuncs = selectedFunctions.get(fileName) || new Set();
+
+      if (selectedFuncs.has(funcName)) {
+        selectedFuncs.delete(funcName);
+        button.classList.remove('active');
+      } else {
+        selectedFuncs.add(funcName);
+        button.classList.add('active');
+      }
+
+      if (selectedFuncs.size > 0) {
+        selectedFunctions.set(fileName, selectedFuncs);
+      } else {
+        selectedFunctions.delete(fileName);
+      }
+    }
+
+    // 生成輸出
+    function generateOutput() {
+      if (selectedFiles.size === 0) {
+        alert('請至少選擇一個檔案！');
+        return;
+      }
+
+      const output = fileData
+        .filter(file => selectedFiles.has(file.name))
+        .map(file => {
+          if (checkedFiles.has(file.name)) {
+            const selectedFuncs = selectedFunctions.get(file.name) || new Set();
+            if (selectedFuncs.size === 0) {
+              return ''; // 無選中 function，跳過
+            }
+            const functionOutputs = Array.from(selectedFuncs).map(func => {
+              const funcContent = extractFunctionContent(file.content, func);
+              return funcContent;
+            });
+            return `<!--${file.name}-->\n${functionOutputs.join('\n\n')}\n<!--${file.name}-->`;
+          } else {
+            return `<!--${file.name}-->\n${file.content}\n<!--${file.name}-->`;
+          }
+        })
+        .filter(output => output !== '')
+        .join('\n\n');
+
+      const outputTextarea = document.getElementById('outputContent');
+      outputTextarea.value = output;
+
+      // 自動複製到剪貼簿
+      outputTextarea.select();
+      try {
+        document.execCommand('copy');
+        alert('已生成並複製到剪貼簿！');
+      } catch (err) {
+        console.error('複製失敗:', err);
+        alert('生成成功，但複製到剪貼簿失敗，請手動複製！');
+      }
+    }
+  </script>
+</body>
+</html>
